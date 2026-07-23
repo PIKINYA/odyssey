@@ -24,6 +24,13 @@ void mm_coroutine_init(mm_coroutine_t *coroutine)
 	mm_list_init(&coroutine->joiners);
 	mm_list_init(&coroutine->link);
 	mm_list_init(&coroutine->link_join);
+	coroutine->cls_size = 20;
+	coroutine->cls_array = mm_malloc(sizeof(mm_cls_node_t) * coroutine->cls_size);
+	for (int i = 0; i < coroutine->cls_size; i++) {
+		coroutine->cls_array[i].value = NULL;
+		coroutine->cls_array[i].dtor = NULL;
+	}
+	
 #ifdef MM_MEM_PROF
 	coroutine->allocated_bytes = 0;
 	coroutine->freed_bytes = 0;
@@ -50,6 +57,13 @@ mm_coroutine_t *mm_coroutine_allocate(int stack_size, int stack_size_guard)
 
 void mm_coroutine_free(mm_coroutine_t *coroutine)
 {
+	for (int i = 0; i < coroutine->cls_size; i++) {
+		if (coroutine->cls_array[i].dtor != NULL) {
+			coroutine->cls_array[i].dtor(coroutine->cls_array[i].value);
+		}
+	}
+	mm_free(coroutine->cls_array);
+	
 	mm_context_destroy(&coroutine->context);
 	mm_contextstack_free(&coroutine->stack);
 	mm_free(coroutine);
@@ -80,4 +94,28 @@ void mm_coroutine_set_name(mm_coroutine_t *coro, const char *name)
 const char *mm_coroutine_get_name(mm_coroutine_t *coro)
 {
 	return coro->name;
+}
+
+int mm_cls_set(mm_coroutine_t *coroutine, int key, void *value, mm_cls_dtor_t dtor) {
+	if (key < 0 || key >= coroutine->cls_size) {
+		return -1;
+	}
+
+	mm_cls_node_t *node = &coroutine->cls_array[key];
+	if (node->value != NULL) {
+		return -2;
+	}
+
+	node->value = value;
+	node->dtor = dtor;
+
+	return 0;
+}
+
+void *mm_cls_get(mm_coroutine_t *coroutine, int key) {
+	if (key < 0 || key >= coroutine->cls_size) {
+		return NULL;
+	}
+
+	return coroutine->cls_array[key].value;
 }

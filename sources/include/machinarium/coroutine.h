@@ -17,8 +17,15 @@
 typedef struct mm_coroutine mm_coroutine_t;
 
 typedef void (*mm_function_t)(void *arg);
+typedef void (*mm_cls_dtor_t)(void *);
 
 typedef enum { MM_CNEW, MM_CREADY, MM_CACTIVE, MM_CFREE } mm_coroutinestate_t;
+
+typedef struct {
+	int key;
+	void *value;
+	mm_cls_dtor_t dtor;
+} mm_cls_node_t;
 
 struct mm_coroutine {
 	uint64_t id;
@@ -36,6 +43,8 @@ struct mm_coroutine {
 	mm_list_t link;
 	int io_count;
 	char name[MM_COROUTINE_MAX_NAME_LEN + 1];
+	mm_cls_node_t *cls_array;
+	int cls_size;
 #ifdef MM_MEM_PROF
 	uint64_t allocated_bytes;
 	uint64_t freed_bytes;
@@ -49,6 +58,8 @@ void mm_coroutine_free(mm_coroutine_t *);
 void mm_coroutine_cancel(mm_coroutine_t *);
 void mm_coroutine_set_name(mm_coroutine_t *, const char *);
 const char *mm_coroutine_get_name(mm_coroutine_t *);
+int mm_cls_set(mm_coroutine_t *, int, void *, mm_cls_dtor_t);
+void *mm_cls_get(mm_coroutine_t *, int);
 
 static inline int mm_coroutine_is_cancelled(mm_coroutine_t *coroutine)
 {
